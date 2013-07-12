@@ -1,4 +1,3 @@
-import urllib2
 import json
 import serial
 import requests
@@ -11,13 +10,12 @@ import threading
 import Queue
 
 
-q = Queue.Queue()
 
 
-class worker_read(threading.Thread):
-    def __init__(self):
-        super(worker_read, self).__init__()
-        self.queue = q
+class Worker_Read(threading.Thread):
+    def __init__(self,queue):
+        super(Worker_Read, self).__init__()
+        self.queue = queue
         self.value = None
         self.command = None
         self.ser = serial.Serial()
@@ -29,44 +27,44 @@ class worker_read(threading.Thread):
 
     def run(self):
         while True:
-            print "SerialRead"
+            print "Read from car"
             data = (self.ser.readline()).split(',')
             self.queue.put({'at': datetime.now().isoformat(),
                             'x': float(data[0]),
                             'y': float(data[1])})
 
 
-class worker_post(threading.Thread):
-    def __init__(self):
-        super(worker_post, self).__init__()
-        self.queue = q
+class Worker_Post(threading.Thread):
+    def __init__(self,queue):
+        super(Worker_Post, self).__init__()
+        self.queue = queue
 
     def run(self):
         while True:
             print "post to web"
             item = self.queue.get()
             urlx = "__________________"
-            header = {"U-ApiKey": "_________________", "Content-type": "application/json"}
+            headers = {"U-ApiKey": "_________________", "Content-type": "application/json"}
             content = json.dumps({"timestamp": item['at'], "value": item['x']})
-            request = urllib2.Request(url, content, header)
-            response = urllib2.urlopen(request)
-
+            r= requests.post(urlx, data=content, headers=headers)
+            
             urly = "__________________"
-            header = {"U-ApiKey": "_________________", "Content-type": "application/json"}
-            content = json.dumps({"timestamp": item['at'],"value": item['y']})
-            request = urllib2.Request(url, content, header)
-            response = urllib2.urlopen(request)
+            headers = {"U-ApiKey": "_________________", "Content-type": "application/json"}
+            content = json.dumps({"timestamp": item['at'], "value": item['y']})
+            r= requests.post(urly, data=content, headers=headers)
+
             self.queue.task_done()
 
 
-class worker_getandwrite(threading.Thread):
+class Worker_GetAndWrite(threading.Thread):
 
     def __init__(self):
-        super(worker_getandwrite, self).__init__()
+        super(Worker_GetAndWrite, self).__init__()
 
     def run(self):
         while True:
-            url = ______________________
+            print "GetAndWrite to car"
+            url = "______________________"
             req = requests.get(url)
             req.headers['Content-type'] = "application/json"
             req.headers['U-ApiKey'] = "_______________"
@@ -79,18 +77,19 @@ class worker_getandwrite(threading.Thread):
 
 
 def main():
-    thread_read = worker_read()
-    thread_read.setDaemon(True)
-    thread_getandwrite = worker_getandwrite()
-    thread_getandwrite.setDaemon(True)
-    thread_post = worker_post()
-    thread_post.setDaemon(True)
-    thread_read.start()
-    thread_getandwrite.start()
-    thread_post.start()
-    thread_read.join()
-    thread_getandwrite.join()
-    thread_post.join()
+    q = Queue.Queue()
+    Thread_Read = Worker_Read(q)
+    Thread_Read.setDaemon(True)
+    Thread_GetAndWrite = Worker_GetAndWrite(q)
+    Thread_GetAndWrite.setDaemon(True)
+    Thread_Post = Worker_Post(q)
+    Thread_Post.setDaemon(True)
+    Thread_Read.start()
+    Thread_GetAndWrite.start()
+    Thread_Post.start()
+    Thread_Read.join()
+    Thread_GetAndWrite.join()
+    Thread_Post.join()
 
 
 if __name__ == "__main__":
