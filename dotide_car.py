@@ -1,7 +1,7 @@
 import json
 import serial
 import requests
-import datetime
+from datetime import datetime
 import time
 import threading
 import Queue
@@ -27,7 +27,6 @@ class ReadWorker(threading.Thread):
             self.queue.put({'at': datetime.now().isoformat(),
                             'x': float(data[0]),
                             'y': float(data[1])})
-            time.sleep(1)
 
 
 class PostWorker(threading.Thread):
@@ -36,30 +35,30 @@ class PostWorker(threading.Thread):
         self.queue = queue
 
     def run(self):
+        headers = {'ApiKey': API_KEY, 'content-type': 'application/json'}
         while True:
+            payload_x = {'datapoints': []}
+            payload_y = {'datapoints': []}
+            for x in range(10):
+                item = self.queue.get()
+                payload_x['datapoints'].append({'at': item['at'], 'value': item['x']})
+                payload_y['datapoints'].append({'at': item['at'], 'value': item['y']})
+                self.queue.task_done()
+
             print 'post to web'
-            item = self.queue.get()
-            headers = {'ApiKey': API_KEY, 'content-type': 'application/json'}
-            payload = {'at': item['at'], 'value': item['x']}
-            requests.post(X_URL, data=json.dumps(payload), headers=headers)
-
-            headers = {'ApiKey': API_KEY, 'content-type': 'application/json'}
-            payload = {'at': item['at'], 'value': item['y']}
-            requests.post(Y_URL, data=json.dumps(payload), headers=headers)
-
-            self.queue.task_done()
+            requests.post(X_URL, data=json.dumps(payload_x), headers=headers)
+            requests.post(Y_URL, data=json.dumps(payload_y), headers=headers)
 
 
 class ControlWorker(threading.Thread):
-
     def __init__(self, serial):
         super(ControlWorker, self).__init__()
         self.ser = serial
 
     def run(self):
+        headers = {'ApiKey': API_KEY, 'content-type': 'application/json'}
         while True:
             print 'GetAndWrite to car'
-            headers = {'ApiKey': API_KEY, 'content-type': 'application/json'}
             res = requests.get(CONTROL_URL, headers=headers)
             print 'get info '
             data = res.json()
